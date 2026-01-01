@@ -1,5 +1,4 @@
 import streamlit as st
-import PyPDF2
 import re
 import nltk
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -10,16 +9,8 @@ from nltk.corpus import stopwords
 nltk.download("stopwords", quiet=True)
 
 # ------------------ FUNCTIONS ------------------
-def extract_text_from_pdf(pdf_file):
-    reader = PyPDF2.PdfReader(pdf_file)
-    text = ""
-    for page in reader.pages:
-        page_text = page.extract_text()
-        if page_text:
-            text += page_text + " "
-    return text
-
 def clean_text(text):
+    """Lowercase, remove non-alphabet, remove stopwords"""
     text = text.lower()
     text = re.sub(r"[^a-z ]", " ", text)
     words = text.split()
@@ -27,12 +18,14 @@ def clean_text(text):
     return " ".join(words)
 
 def calculate_similarity(resume_text, jd_text):
+    """Return cosine similarity percentage"""
     vectorizer = TfidfVectorizer()
     vectors = vectorizer.fit_transform([resume_text, jd_text])
     score = cosine_similarity(vectors)[0][1]
     return round(score * 100, 2)
 
 def extract_keywords(text, n=20):
+    """Return top n keywords using TF-IDF"""
     vectorizer = TfidfVectorizer(max_features=n, stop_words="english")
     vectorizer.fit([text])
     return vectorizer.get_feature_names_out()
@@ -48,7 +41,7 @@ st.set_page_config(
 st.markdown(
     """
     <div style="background-color:#4B8BBE;padding:15px;border-radius:10px">
-        <h1 style="color:white;text-align:center;">📄 AI Resume Analyzer</h1>
+        <h1 style="color:white;text-align:center;">📄 AI Resume Analyzer (Text Only)</h1>
         <p style="color:white;text-align:center;font-size:16px;">
         Compare your resume against a job description and see skill matches.
         </p>
@@ -61,16 +54,19 @@ st.write("---")
 
 # ------------------ INPUT SECTION ------------------
 with st.container():
-    st.subheader("Upload & Job Description")
-    col1, col2 = st.columns([1, 2])
+    st.subheader("Paste Resume & Job Description")
+    col1, col2 = st.columns(2)
     
     with col1:
-        resume_file = st.file_uploader("📁 Upload Resume (PDF)", type=["pdf"])
+        resume_text = st.text_area(
+            "📝 Paste your resume text here",
+            placeholder="Paste your resume as plain text..."
+        )
         
     with col2:
         job_description = st.text_area(
-            "📝 Paste Job Description",
-            placeholder="Paste the job description here..."
+            "📌 Paste Job Description here",
+            placeholder="Paste the job description..."
         )
 
 # ------------------ ANALYSIS BUTTON ------------------
@@ -78,9 +74,8 @@ analyze_btn = st.button("Analyze Resume", type="primary")
 
 # ------------------ RESULTS SECTION ------------------
 if analyze_btn:
-    if resume_file and job_description:
+    if resume_text.strip() and job_description.strip():
         with st.spinner("🔍 Analyzing resume..."):
-            resume_text = extract_text_from_pdf(resume_file)
             resume_clean = clean_text(resume_text)
             jd_clean = clean_text(job_description)
 
@@ -96,8 +91,6 @@ if analyze_btn:
 
         # ---------- MATCH SCORE ----------
         st.metric(label="Match Score (%)", value=f"{score}%")
-
-        # ---------- PROGRESS BAR ----------
         st.progress(score / 100)
 
         st.write("---")
@@ -120,8 +113,9 @@ if analyze_btn:
 
         st.write("---")
 
-        # ---------- OPTIONAL: TOP RESUME KEYWORDS ----------
+        # ---------- TOP RESUME KEYWORDS ----------
         st.subheader("📌 Top Keywords in Resume")
         st.write(", ".join(sorted(resume_keywords)))
+
     else:
-        st.warning("Please upload a resume and paste a job description.")
+        st.warning("Please paste both resume text and job description.")
